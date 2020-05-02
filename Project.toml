@@ -3,6 +3,9 @@ uuid = "25b0cc0c-38e4-462f-a11d-8564868c562d"
 authors = ["Fredrik Bagge Carlson"]
 version = "0.1.0"
 
+[deps]
+UnsafeArrays = "c4a57d5a-5b31-53a6-b365-19f8c011fbd6"
+
 [compat]
 julia = "1"
 
