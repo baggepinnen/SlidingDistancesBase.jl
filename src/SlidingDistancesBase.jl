@@ -5,22 +5,21 @@ using UnsafeArrays
 export distance_profile, distance_profile!, lastlength, getwindow, floattype
 
 
-
-
 floattype(T::Type{<:Integer}) = float(T)
 floattype(T::Type{<:AbstractFloat}) = T
 floattype(_) = Float64
 
-Base.@propagate_inbounds Base.getindex(v::AbstractVector, ::typeof(!), i) = v[i]
-Base.@propagate_inbounds Base.getindex(v::AbstractVector, ::typeof(!), i::AbstractRange) = uview(v, i)
-Base.@propagate_inbounds Base.getindex(v::AbstractMatrix, ::typeof(!), i) = uview(v,:,i)
-Base.@propagate_inbounds Base.getindex(v::AbstractArray{<:Any,3}, ::typeof(!), i) = uview(v,:,:,i)
+Base.@propagate_inbounds @inline Base.getindex(v::AbstractVector, ::typeof(!), i) = v[i]
+Base.@propagate_inbounds @inline Base.getindex(v::AbstractVector, ::typeof(!), i::AbstractRange) = uview(v, i)
+Base.@propagate_inbounds @inline Base.getindex(v::AbstractMatrix, ::typeof(!), i) = uview(v,:,i)
+Base.@propagate_inbounds @inline Base.getindex(v::AbstractArray{<:Any,3}, ::typeof(!), i) = uview(v,:,:,i)
 
-Base.@propagate_inbounds Base.setindex!(v::AbstractVector, val, ::typeof(!), i) = v[i] = val
-Base.@propagate_inbounds Base.setindex!(v::AbstractVector, val, ::typeof(!), i::AbstractRange) = v[i] .= val
-Base.@propagate_inbounds Base.setindex!(v::AbstractMatrix, val, ::typeof(!), i) = v[:,i] .= val
-Base.@propagate_inbounds Base.setindex!(v::AbstractArray{<:Any,3}, val, ::typeof(!), i) = v[:,:,i] .= val
+Base.@propagate_inbounds @inline Base.setindex!(v::AbstractVector, val, ::typeof(!), i) = v[i] = val
+Base.@propagate_inbounds @inline Base.setindex!(v::AbstractVector, val, ::typeof(!), i::AbstractRange) = v[i] .= val
+Base.@propagate_inbounds @inline Base.setindex!(v::AbstractMatrix, val, ::typeof(!), i) = v[:,i] .= val
+Base.@propagate_inbounds @inline Base.setindex!(v::AbstractArray{<:Any,3}, val, ::typeof(!), i) = v[:,:,i] .= val
 
+"Return the length of the last axis"
 lastlength(x) = size(x, ndims(x))
 
 """
@@ -28,13 +27,13 @@ lastlength(x) = size(x, ndims(x))
 
 Extract a window of length `m` staring at `i`. The returned object will be an `UnsafeView` into `T`.
 """
-getwindow(T,m,i) = T[!, (0:m-1) .+ i]
+Base.@propagate_inbounds @inline getwindow(T,m,i) = T[!, (0:m-1) .+ i]
 
 
 """
     distance_profile(dist, Q, T; kwargs...)
 
-Calculate the distance profile corresponding to sliding `Q` over `T` and measureing distances between time windows using `dist`
+Calculate the distance profile corresponding to sliding `Q` over `T` and measuring distances between time windows using `dist`
 
 The output is a vector of length `length(T) - length(Q) + 1`.
 If inputs are matrices or higher-dimensional arrays, time is considered to be the last axis, and windows on the form `T[:, t:t+lastlength(Q)-1]`, where `lastlength` measures the length along the last axis, are compared.
