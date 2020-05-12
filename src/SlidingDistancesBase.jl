@@ -7,8 +7,9 @@ using Distances
 export evaluate
 
 using LoopVectorization
+using DSP: conv
 
-export distance_profile, distance_profile!, lastlength, getwindow, floattype, ZEuclidean, meanstd
+export distance_profile, distance_profile!, lastlength, getwindow, floattype, znorm, ZEuclidean, meanstd, running_mean_std
 
 
 floattype(T::Type{<:Integer}) = float(T)
@@ -70,6 +71,11 @@ function distance_profile!(D::AbstractArray, dist, Q::AbstractArray{S}, T::Abstr
 end
 
 
+function znorm(x::AbstractVector)
+    x = x .- mean(x)
+    x ./= std(x, mean=0, corrected=false)
+end
+
 struct ZEuclidean <: Distances.Metric end
 
 function meanstd(x::AbstractArray{T}) where T
@@ -97,6 +103,111 @@ end
 
 (d::ZEuclidean)(x, y) = evaluate(d, x, y)
 
+
+
+function distance_profile!(D::AbstractVector{S},::ZEuclidean, QT::AbstractVector{S}, μ, σ, m::Int, i::Int) where S <: Number
+    @assert i <= length(D)
+    @avx for j = eachindex(D)
+        frac = (QT[j] - m*μ[i]*μ[j]) / (m*σ[i]*σ[j])
+        D[j] = sqrt(max(2m*(1-frac), 0))
+    end
+    D[i] = typemax(eltype(D))
+    D
+end
+
+distance_profile(
+    ::ZEuclidean,
+    QT::AbstractVector{S},
+    μ::AbstractVector{S},
+    σ::AbstractVector{S},
+    m::Int,
+) where {S<:Number} = distance_profile!(similar(μ), ZEuclidean(), QT, μ, σ, m, 1)
+
+
+function distance_profile!(D::AbstractVector{S},::ZEuclidean, QT::AbstractVector{S}, μA, σA, μT, σT, m::Int, i::Int) where S <: Number
+    @assert i <= length(μA)
+    @avx for j = eachindex(D,QT,μT,σT)
+        frac = (QT[j] - m*μA[i]*μT[j]) / (m*σA[i]*σT[j])
+        D[j] = sqrt(max(2m*(1-frac), 0))
+    end
+    D
+end
+
+distance_profile(::ZEuclidean, QT::AbstractVector{S}, μA, σA, μT, σT, m::Int) where {S<:Number} =
+    distance_profile!(similar(μT), ZEuclidean(), QT, μA, σA, μT, σT, m, 1)
+
+
+"""
+    distance_profile(::ZEuclidean, Q, T)
+
+Compute the z-normalized Euclidean distance profile corresponding to sliding `Q` over `T`
+"""
+function distance_profile!(
+    D::AbstractVector{S},
+    ::ZEuclidean,
+    Q::AbstractVector{S},
+    T::AbstractVector{S},
+) where {S<:Number}
+    m = length(Q)
+    μ, σ = running_mean_std(T, m)
+    QT = window_dot(znorm(Q), T)
+    @avx for j in eachindex(D)
+        frac = QT[j] / (m * σ[j])
+        D[j] = sqrt(max(2m * (1 - frac), 0))
+    end
+    D
+end
+distance_profile(::ZEuclidean, Q::AbstractArray{S}, T::AbstractArray{S}) where {S} =
+    distance_profile!(similar(T, length(T) - length(Q) + 1), ZEuclidean(), Q, T)
+
+"""
+The dot product between query Q and all subsequences of the same length as Q in time series T
+"""
+function window_dot(Q, T)
+    n   = length(T)
+    m   = length(Q)
+    QT  = conv(reverse(Q), T)
+    return QT[m:n]
+end
+
+function running_mean_std(x::AbstractArray{T}, m) where T
+    @assert length(x) >= m
+    n = length(x)-m+1
+    s = ss = zero(T)
+    μ = similar(x, n)
+    σ = similar(x, n)
+    @avx for i = 1:m
+        s  += x[i]
+        ss += x[i]^2
+    end
+    μ[1] = s/m
+    σ[1] = sqrt(ss/m - μ[1]^2)
+    @fastmath @inbounds for i = 1:n-1 # fastmath making it more accurate here as well, but not faster
+        s -= x[i]
+        ss -= x[i]^2
+        s += x[i+m]
+        ss += x[i+m]^2
+        μ[i+1] = s/m
+        σ[i+1] = sqrt(ss/m - μ[i+1]^2)
+    end
+    μ,σ
+end
+
+function moving_mean!(μ,x::AbstractArray{T}, m) where T
+    @assert length(x) >= m
+    n = length(x)-m+1
+    s = zero(T)
+    @avx for i = 1:m
+        s  += x[i]
+    end
+    μ[1] = s/m
+    @fastmath @inbounds for i = 1:n-1 # fastmath making it more accurate here as well, but not faster
+        s -= x[i]
+        s += x[i+m]
+        μ[i+1] = s/m
+    end
+    μ
+end
 
 
 end
