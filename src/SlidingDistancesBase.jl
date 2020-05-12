@@ -1,13 +1,13 @@
 module SlidingDistancesBase
 
-using Statistics
+using Statistics, LinearAlgebra
 
 using UnsafeArrays
 using Distances
 export evaluate
 
 using LoopVectorization
-using DSP: conv
+using DSP
 
 export distance_profile, distance_profile!, lastlength, getwindow, floattype, znorm, ZEuclidean, meanstd, running_mean_std, running_mean!
 
@@ -167,6 +167,66 @@ function window_dot(Q, T)
     n   = length(T)
     m   = length(Q)
     QT  = conv(reverse(Q), T)
+    return QT[m:n]
+end
+
+
+struct ConvPlan{UT,P,CT}
+    padded::UT
+    plan::P
+    uf::CT
+    vf::CT
+    raw_out::UT
+    out::UT
+    nfft::Int
+end
+
+function ConvPlan(u,v)
+    if length(v) > length(u)
+        u,v = v,u
+    end
+    su = size(u)
+    sv = size(v)
+
+    outsize = su .+ sv .- 1
+    out = DSP._conv_similar(u, v, outsize)
+    nfft = DSP.nextfastfft(outsize)[1]
+    padded = DSP._zeropad(u, (nfft,))
+    plan = DSP.plan_rfft(padded)
+
+    uf = Vector{Complex{eltype(u)}}(undef, nfft÷2+1)
+    vf = Vector{Complex{eltype(v)}}(undef, nfft÷2+1)
+    raw_out = similar(u)
+    out = similar(u, outsize)
+    ConvPlan(padded, plan, uf, vf, raw_out, out, nfft)
+end
+
+function conv!(p::ConvPlan, u, v)
+    if length(v) > length(u)
+        u,v = v,u
+    end
+    su = size(u)
+    sv = size(v)
+    outsize = su .+ sv .- 1
+
+    p.padded .= 0
+    copyto!(p.padded, 1, u, 1, length(u))
+    mul!(p.uf, p.plan, p.padded)
+    DSP._zeropad!(p.padded, v)
+    mul!(p.vf, p.plan, p.padded)
+    p.uf .*= p.vf
+    raw_out = DSP.irfft(p.uf, p.nfft)
+    # copyto!(p.out,
+    #         CartesianIndices(p.out),
+    #         p.raw_out,
+    #         CartesianIndices(UnitRange.(1, outsize)))
+end
+
+
+function window_dot!(p::ConvPlan, Q, T)
+    n   = length(T)
+    m   = length(Q)
+    QT  = conv!(p, reverse(Q), T)
     return QT[m:n]
 end
 

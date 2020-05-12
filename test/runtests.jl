@@ -133,3 +133,16 @@ end
 # @code_llvm evaluate(d,x,x)
 # @btime meanstd($x)
 # @btime evaluate($d,$x,$x)
+
+
+Q = randn(2000); T = randn(20000);
+QT = window_dot(Q,T)
+
+p = SlidingDistancesBase.ConvPlan(Q,T)
+QT2 = SlidingDistancesBase.window_dot!(p, Q, T)
+QT ≈ QT2
+
+
+
+@btime window_dot($Q, $T)
+@btime SlidingDistancesBase.window_dot!($p, $Q, $T)
