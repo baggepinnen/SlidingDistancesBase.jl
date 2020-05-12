@@ -102,6 +102,8 @@ norm = x -> sqrt(sum(abs2, x))
                     @test mx[2] ≈ mean(x[2:w+1])
                     @test sx[2] ≈ std(x[2:w+1], corrected=false)
 
+                    @test running_mean!(similar(mx), x, w) ≈ mx
+
                     my,sy = running_mean_std(y, w)
                     QT = window_dot(getwindow(x,w,1), y)
                     D = distance_profile(ZEuclidean(), QT, mx,sx,my,sy,w)

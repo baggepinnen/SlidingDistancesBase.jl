@@ -9,7 +9,7 @@ export evaluate
 using LoopVectorization
 using DSP: conv
 
-export distance_profile, distance_profile!, lastlength, getwindow, floattype, znorm, ZEuclidean, meanstd, running_mean_std
+export distance_profile, distance_profile!, lastlength, getwindow, floattype, znorm, ZEuclidean, meanstd, running_mean_std, running_mean!
 
 
 floattype(T::Type{<:Integer}) = float(T)
@@ -193,7 +193,7 @@ function running_mean_std(x::AbstractArray{T}, m) where T
     μ,σ
 end
 
-function moving_mean!(μ,x::AbstractArray{T}, m) where T
+function running_mean!(μ,x::AbstractArray{T}, m) where T
     @assert length(x) >= m
     n = length(x)-m+1
     s = zero(T)
