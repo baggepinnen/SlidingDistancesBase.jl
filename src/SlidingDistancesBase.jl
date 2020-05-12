@@ -1,8 +1,14 @@
 module SlidingDistancesBase
 
-using UnsafeArrays
+using Statistics
 
-export distance_profile, distance_profile!, lastlength, getwindow, floattype
+using UnsafeArrays
+using Distances
+export evaluate
+
+using LoopVectorization
+
+export distance_profile, distance_profile!, lastlength, getwindow, floattype, ZEuclidean, meanstd
 
 
 floattype(T::Type{<:Integer}) = float(T)
@@ -62,6 +68,35 @@ function distance_profile!(D::AbstractArray, dist, Q::AbstractArray{S}, T::Abstr
         dist(Q, getwindow(T, m, i); kwargs...)
     end
 end
+
+
+struct ZEuclidean <: Distances.Metric end
+
+function meanstd(x::AbstractArray{T}) where T
+    s = ss = zero(T)
+    n = length(x)
+    @avx for i in eachindex(x)
+        s  += x[i]
+        ss += x[i]^2
+    end
+    m   = s/n
+    sig = √(ss/n - m^2)
+    m, sig
+end
+
+
+function Distances.evaluate(d::ZEuclidean, x::AbstractArray{T}, y::AbstractArray{T}) where T
+    mx,sx = meanstd(x)
+    my,sy = meanstd(y)
+    s = zero(T)
+    @avx for i in eachindex(x,y)
+        s += ((x[i]-mx)/sx - (y[i]-my)/sy)^2
+    end
+    √(s)
+end
+
+(d::ZEuclidean)(x, y) = evaluate(d, x, y)
+
 
 
 end

@@ -1,5 +1,6 @@
 using SlidingDistancesBase
-using Test
+using Distances
+using Test, Statistics
 
 norm = x -> sqrt(sum(abs2, x))
 
@@ -52,9 +53,35 @@ norm = x -> sqrt(sum(abs2, x))
         v[!,1] = [1 2 3; 1 2 3]
         v[!,1:2] = cat([1 2 3; 1 2 3], [1 2 3; 1 2 3], dims=3)
 
+    end
+
+    @testset "meanstd" begin
+        @info "Testing meanstd"
+        x = randn(100)
+        m,s = meanstd(x)
+        @test m ≈ mean(x)
+        @test s ≈ std(x, corrected=false)
+    end
+
+    function znorm(x::AbstractVector)
+        x = x .- mean(x)
+        x ./= std(x, mean=0, corrected=false)
+    end
 
 
-
+    @testset "ZEuclidean" begin
+        @info "Testing ZEuclidean"
+        d = ZEuclidean()
+        x,y = randn(100) .+ 1, 2randn(100)
+        @test evaluate(d,x,y) ≈ d(x,y) ≈ evaluate(Euclidean(), znorm(x), znorm(y))
     end
 
 end
+
+
+# d = ZEuclidean()
+# x = randn(100)
+# @code_llvm meanstd(x)
+# @code_llvm evaluate(d,x,x)
+# @btime meanstd($x)
+# @btime evaluate($d,$x,$x)
