@@ -1,3 +1,4 @@
+"Z-normalize the input array"
 function znorm(x::AbstractVector)
     x = x .- mean(x)
     x ./= std(x, mean=0, corrected=false)
@@ -8,6 +9,11 @@ function znorm!(x::AbstractVector)
     x ./= std(x, mean=0, corrected=false)
 end
 
+"""
+    meanstd(x::AbstractArray)
+
+Return mean and std of `x`. Is faster but less accurate than built-in functions.
+"""
 function meanstd(x::AbstractArray{T}) where T
     s = ss = zero(float(T))
     n = length(x)
@@ -46,7 +52,7 @@ Works like a vector, index into window with `z[i]`, index into normalized window
 # Arguments:
 - `x::Vector{T}`: The vecetor to operate on
 - `n::Int`: The lenght of a window
-- `μ::T`: mean over windo
+- `μ::T`: mean over window
 - `σ::T`: std over window
 - `s::T`: sum over window
 - `ss::T`: sum^2 over window
@@ -66,7 +72,7 @@ mutable struct ZNormalizer{T} <: AbstractZNormalizer{T,1}
     bufi::Int
 end
 
-function ZNormalizer(x::AbstractArray{T,1}, n) where T
+function ZNormalizer(x::AbstractVector{T}, n) where T
     @assert length(x) >= n
     s = ss = zero(T)
     @avx for i in 1:n
@@ -234,7 +240,6 @@ end
 end
 
 Base.Matrix(z::IsoZNormalizer) = z.x[:,z.i:z.i+z.n-1]
-
 
 Base.length(z::IsoZNormalizer) = size(z.x,1) * z.n
 Base.size(z::IsoZNormalizer) = (size(z.x,1), z.n)

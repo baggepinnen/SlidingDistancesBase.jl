@@ -2,6 +2,7 @@ module SlidingDistancesBase
 
 using Statistics
 using UnsafeArrays
+using DocStringExtensions
 
 export evaluate
 using Distances
@@ -19,7 +20,7 @@ include("indexing.jl")
 export distance_profile, distance_profile!, sliding_mean_std, sliding_mean!
 include("sliding.jl")
 
-export ZNormalizer, IsoZNormalizer, normalize, znorm, meanstd, advance!
+export AbstractNormalizer, ZNormalizer, IsoZNormalizer, normalize, znorm, meanstd, advance!
 include("normalizers.jl")
 
 export AbstractSearchResult, BatchSearchResult, value, location, payload, target, targetlength

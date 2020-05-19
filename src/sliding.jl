@@ -22,6 +22,7 @@ function distance_profile(dist, Q::AbstractArray{S}, T::AbstractArray{S}; kwargs
     end
 end
 
+"$(SIGNATURES)"
 function distance_profile!(D::AbstractArray, dist, Q::AbstractArray{S}, T::AbstractArray{S}; kwargs...) where S
     m = lastlength(Q)
     n = lastlength(T)
@@ -33,6 +34,7 @@ function distance_profile!(D::AbstractArray, dist, Q::AbstractArray{S}, T::Abstr
     end
 end
 
+"$(SIGNATURES)"
 function distance_profile!(D::AbstractVector{S},::ZEuclidean, QT::AbstractVector{S}, μ, σ, m::Int, i::Int) where S <: Number
     @assert i <= length(D)
     @avx for j = eachindex(D)
@@ -43,6 +45,7 @@ function distance_profile!(D::AbstractVector{S},::ZEuclidean, QT::AbstractVector
     D
 end
 
+"$(SIGNATURES)"
 distance_profile(
     ::ZEuclidean,
     QT::AbstractVector{S},
@@ -51,7 +54,11 @@ distance_profile(
     m::Int,
 ) where {S<:Number} = distance_profile!(similar(μ), ZEuclidean(), QT, μ, σ, m, 1)
 
+"""
+    $(SIGNATURES)
 
+Accepts precomputed sliding mean and std of the input arrays. `QT` is the windowed dot product and `i` is the index into `T` (the longer time series).
+"""
 function distance_profile!(D::AbstractVector{S},::ZEuclidean, QT::AbstractVector{S}, μA, σA, μT, σT, m::Int, i::Int) where S <: Number
     @assert i <= length(μA)
     @avx for j = eachindex(D,QT,μT,σT)
@@ -61,6 +68,7 @@ function distance_profile!(D::AbstractVector{S},::ZEuclidean, QT::AbstractVector
     D
 end
 
+"$(SIGNATURES)"
 distance_profile(::ZEuclidean, QT::AbstractVector{S}, μA, σA, μT, σT, m::Int) where {S<:Number} =
     distance_profile!(similar(μT), ZEuclidean(), QT, μA, σA, μT, σT, m, 1)
 
@@ -86,6 +94,7 @@ function distance_profile!(
     D
 end
 
+"$(SIGNATURES)"
 distance_profile(::ZEuclidean, Q::AbstractArray{S}, T::AbstractArray{S}) where {S} =
     distance_profile!(similar(T, length(T) - length(Q) + 1), ZEuclidean(), Q, T)
 
@@ -99,13 +108,18 @@ function window_dot(Q, T)
     return QT[m:n]
 end
 
+"""
+    $(SIGNATURES)
+
+return vectors with mean and std of sliding windows of length `m`
+"""
 function sliding_mean_std(x::AbstractArray{T}, m) where T
     @assert length(x) >= m
     n = length(x)-m+1
     s = ss = zero(float(T))
     μ = Vector{float(T)}(undef, n)
     σ = Vector{float(T)}(undef, n)
-    @avx for i = 1:m # TODO: change to @avx after https://github.com/chriselrod/LoopVectorization.jl/issues/114
+    @avx for i = 1:m
         s  += x[i]
         ss += x[i]^2
     end
@@ -122,11 +136,16 @@ function sliding_mean_std(x::AbstractArray{T}, m) where T
     μ,σ
 end
 
+"""
+    $(SIGNATURES)
+
+return mean of sliding windows of length `m`. Operates in-place and stores result in first argument
+"""
 function sliding_mean!(μ,x::AbstractArray{T}, m) where T
     @assert length(x) >= m
     n = length(x)-m+1
     s = zero(T)
-    @avx for i = 1:m # TODO: change to @avx after https://github.com/chriselrod/LoopVectorization.jl/issues/114
+    @avx for i = 1:m
         s += x[i]
     end
     μ[1] = s/m
