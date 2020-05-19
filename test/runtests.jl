@@ -94,7 +94,7 @@ norm = x -> sqrt(sum(abs2, x))
                 x = randn(l1)
                 y = randn(l2)
                 for w = 4:2:10
-                    mx,sx = running_mean_std(x, w)
+                    mx,sx = sliding_mean_std(x, w)
                     @test length(mx) == length(sx) == length(x)-w+1
                     @test mx[1] ≈ mean(x[1:w])
                     @test sx[1] ≈ std(x[1:w], corrected=false)
@@ -102,9 +102,9 @@ norm = x -> sqrt(sum(abs2, x))
                     @test mx[2] ≈ mean(x[2:w+1])
                     @test sx[2] ≈ std(x[2:w+1], corrected=false)
 
-                    @test running_mean!(similar(mx), x, w) ≈ mx
+                    @test sliding_mean!(similar(mx), x, w) ≈ mx
 
-                    my,sy = running_mean_std(y, w)
+                    my,sy = sliding_mean_std(y, w)
                     QT = window_dot(getwindow(x,w,1), y)
                     D = distance_profile(ZEuclidean(), QT, mx,sx,my,sy,w)
                     @test D[1] ≈ ZEuclidean()(x[1:w], y[1:w])        atol=1e-5
@@ -152,6 +152,12 @@ norm = x -> sqrt(sum(abs2, x))
 
         @test pl[r] == pl[ind:ind+length(tg)-1]
         @test ["1","2","3","4"][r] == "3"
+    end
+
+    @testset "Normalizers" begin
+        @info "Testing Normalizers"
+        include("test_normalizers.jl")
+
     end
 
 

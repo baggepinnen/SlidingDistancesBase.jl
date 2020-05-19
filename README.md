@@ -8,8 +8,8 @@ This package defines some common functionality used to calculate a distance betw
 - `distance_profile(dist, query, timeseries)`
 - `distance_profile!(D, dist, query, timeseries)`
 - `ZEuclidean <: Distances.Metric` a Z-normalized Euclidean distance
-- `running_mean!`
-- `running_mean_std`
+- `sliding_mean!`
+- `sliding_mean_std`
 
 
 This package is used by
