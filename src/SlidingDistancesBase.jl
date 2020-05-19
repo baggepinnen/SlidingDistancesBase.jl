@@ -11,6 +11,14 @@ using DSP: conv
 
 export distance_profile, distance_profile!, lastlength, getwindow, floattype, znorm, ZEuclidean, meanstd, running_mean_std, running_mean!
 
+export AbstractSearchResult, BatchSearchResult
+
+export value,
+location,
+payload,
+target,
+targetlength
+
 
 floattype(T::Type{<:Integer}) = float(T)
 floattype(T::Type{<:AbstractFloat}) = T
@@ -79,7 +87,7 @@ end
 struct ZEuclidean <: Distances.Metric end
 
 function meanstd(x::AbstractArray{T}) where T
-    s = ss = zero(T)
+    s = ss = zero(float(T))
     n = length(x)
     @avx for i in eachindex(x)
         s  += x[i]
@@ -94,7 +102,7 @@ end
 function Distances.evaluate(d::ZEuclidean, x::AbstractArray{T}, y::AbstractArray{T}) where T
     mx,sx = meanstd(x)
     my,sy = meanstd(y)
-    s = zero(T)
+    s = zero(float(T))
     @avx for i in eachindex(x,y)
         s += ((x[i]-mx)/sx - (y[i]-my)/sy)^2
     end
@@ -150,8 +158,8 @@ function distance_profile!(
 ) where {S<:Number}
     m = length(Q)
     μ, σ = running_mean_std(T, m)
-    QT = window_dot(znorm(Q), T)
-    @avx for j in eachindex(D)
+    QT = window_dot(znorm(Q), T) # TODO: allocates a new znorm(Q) each time
+    @avx for j in eachindex(D,QT,σ)
         frac = QT[j] / (m * σ[j])
         D[j] = sqrt(max(2m * (1 - frac), 0))
     end
@@ -173,22 +181,22 @@ end
 function running_mean_std(x::AbstractArray{T}, m) where T
     @assert length(x) >= m
     n = length(x)-m+1
-    s = ss = zero(T)
-    μ = similar(x, n)
-    σ = similar(x, n)
-    @avx for i = 1:m
+    s = ss = zero(float(T))
+    μ = Vector{float(T)}(undef, n)
+    σ = Vector{float(T)}(undef, n)
+    @avx for i = 1:m # TODO: change to @avx after https://github.com/chriselrod/LoopVectorization.jl/issues/114
         s  += x[i]
         ss += x[i]^2
     end
     μ[1] = s/m
-    σ[1] = sqrt(ss/m - μ[1]^2)
+    σ[1] = sqrt(max(ss/m - μ[1]^2, 0))
     @fastmath @inbounds for i = 1:n-1 # fastmath making it more accurate here as well, but not faster
         s -= x[i]
         ss -= x[i]^2
         s += x[i+m]
         ss += x[i+m]^2
         μ[i+1] = s/m
-        σ[i+1] = sqrt(ss/m - μ[i+1]^2)
+        σ[i+1] = sqrt(max(ss/m - μ[i+1]^2, 0))
     end
     μ,σ
 end
@@ -197,8 +205,8 @@ function running_mean!(μ,x::AbstractArray{T}, m) where T
     @assert length(x) >= m
     n = length(x)-m+1
     s = zero(T)
-    @avx for i = 1:m
-        s  += x[i]
+    @avx for i = 1:m # TODO: change to @avx after https://github.com/chriselrod/LoopVectorization.jl/issues/114
+        s += x[i]
     end
     μ[1] = s/m
     @fastmath @inbounds for i = 1:n-1 # fastmath making it more accurate here as well, but not faster
@@ -208,6 +216,44 @@ function running_mean!(μ,x::AbstractArray{T}, m) where T
     end
     μ
 end
+
+
+
+
+
+abstract type AbstractSearchResult{T} end
+value(r::AbstractSearchResult) = r.value
+value(r::Number) = r
+location(r::AbstractSearchResult) = r.ind
+payload(r::AbstractSearchResult) = r.payload
+target(r::AbstractSearchResult) = r.target
+targetlength(r) = lastlength(target(r))
+Base.isless(a::AbstractSearchResult,b::AbstractSearchResult) = isless(value(a), value(b))
+Base.isless(a::Number,b::AbstractSearchResult) = isless(value(a), value(b))
+Base.isless(a::AbstractSearchResult,b::Number) = isless(value(a), value(b))
+Base.promote_rule(::Type{T}, ::Type{<:AbstractSearchResult}) where T <:Number = T
+Base.convert(::Type{T}, r::AbstractSearchResult) where T <:Number = T(value(r))
+Base.:*(n::Number, r::AbstractSearchResult) = n*value(r)
+
+
+Base.getindex(v::T, s::AbstractSearchResult{T}) where {T<:AbstractArray} =
+    getwindow(v, targetlength(s), location(s))
+
+
+Base.@kwdef struct BatchSearchResult{T} <: AbstractSearchResult{T}
+    target::T
+    value
+    ind::Int
+    batch_ind::Int
+    payload = nothing
+end
+
+Base.:(==)(a::BatchSearchResult,b::BatchSearchResult) = a.batch_ind == b.batch_ind && location(a) == location(b)
+Base.getindex(v::Vector{String}, b::BatchSearchResult) = v[b.batch_ind]
+
+
+
+
 
 
 end

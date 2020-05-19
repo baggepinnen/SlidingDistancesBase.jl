@@ -123,6 +123,38 @@ norm = x -> sqrt(sum(abs2, x))
     end
 
 
+    @testset "SearchResultInterface" begin
+        @info "Testing SearchResultInterface"
+
+        tg        = randn(3)
+        val       = 4
+        ind       = 2
+        batch_ind = 3
+        pl        = randn(5)
+
+        r = BatchSearchResult(tg, val, ind, batch_ind, pl)
+
+        @test value(r)        == val
+        @test value(1)        == 1
+        @test location(r)     == ind
+        @test payload(r)      == pl
+        @test target(r)       == tg
+        @test targetlength(r) == 3
+
+        @test 1 < r < 100
+        @test r < 2r
+        @test 2r == 8
+        @test r == r
+        @test sort([2r, r]) == [r, 2r]
+
+        @test promote_rule(Float64, typeof(r)) == Float64
+        @test convert(Float64, r) == val
+
+        @test pl[r] == pl[ind:ind+length(tg)-1]
+        @test ["1","2","3","4"][r] == "3"
+    end
+
+
 
 end
 
