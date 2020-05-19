@@ -142,7 +142,7 @@ norm = x -> sqrt(sum(abs2, x))
         @test targetlength(r) == 3
 
         @test 1 < r < 100
-        @test r < 2r
+        @test !(r < r)
         @test 2r == 8
         @test r == r
         @test sort([2r, r]) == [r, 2r]
