@@ -113,7 +113,7 @@ end
 
 return vectors with mean and std of sliding windows of length `m`
 """
-function sliding_mean_std(x::AbstractArray{T}, m) where T
+function sliding_mean_std(x::AbstractVector{T}, m) where T
     @assert length(x) >= m
     n = length(x)-m+1
     s = ss = zero(float(T))
@@ -136,14 +136,40 @@ function sliding_mean_std(x::AbstractArray{T}, m) where T
     μ,σ
 end
 
+@inbounds @fastmath function sliding_mean_std(x::AbstractMatrix{T}, m) where T
+    @assert lastlength(x) >= m
+    n = lastlength(x)-m+1
+    s  = zeros(T, size(x,1))
+    ss = zeros(T, size(x,1))
+    μ = Matrix{float(T)}(undef, size(x,1), n)
+    σ = Matrix{float(T)}(undef, size(x,1), n)
+    @simd for i = 1:m
+        s  .+= x[!,i]
+        ss .+= x[!,i].^2
+    end
+    μ[!,1] = s./m
+    σ[!,1] = sqrt.(max.(ss./m .- μ[!,1].^2, 0))
+    for i = 1:n-1 # fastmath making it more accurate here as well, but not faster
+        s .-= x[!,i]
+        ss .-= x[!,i].^2
+        s .+= x[!,i+m]
+        ss .+= x[!,i+m].^2
+        μ[!,i+1] = s./m
+        σ[!,i+1] = sqrt.(max.(ss./m .- μ[!,i+1].^2, 0))
+    end
+    μ,σ
+end
+
 """
     $(SIGNATURES)
 
 return mean of sliding windows of length `m`. Operates in-place and stores result in first argument
 """
-function sliding_mean!(μ,x::AbstractArray{T}, m) where T
-    @assert length(x) >= m
+function sliding_mean!(μ,x::AbstractVector{T}, m) where T
     n = length(x)-m+1
+    @assert length(x) >= m
+    @assert length(μ) >= n
+
     s = zero(T)
     @avx for i = 1:m
         s += x[i]
@@ -155,4 +181,43 @@ function sliding_mean!(μ,x::AbstractArray{T}, m) where T
         μ[i+1] = s/m
     end
     μ
+end
+
+"""
+$(SIGNATURES)
+
+Returns the sliding-window entropy
+"""
+function sliding_entropy(x::AbstractVecOrMat{T}, m=actuallastlength(x)) where T
+    N = actuallastlength(x)
+    n = N-m+1
+    e = Vector{T}(undef, n)
+    ent = zeros(T, N)
+    x isa AbstractVector && (x = x')
+    @fastmath @inbounds for i = 1:N # TODO: add @avx after https://github.com/chriselrod/LoopVectorization.jl/issues/117
+        @simd for j = 1:size(x,1)
+            ent[i] += x[j,i]*log(x[j,i])
+        end
+    end
+    e0 = zero(T)
+    @fastmath @inbounds @simd for i = 1:m
+        e0 += ent[i]
+    end
+    e[1] = e0
+    @fastmath @inbounds for i = 1:n-1
+        e0 -= ent[i]
+        e0 += ent[i+m]
+        e[i+1] = e0
+    end
+    e .= .-e
+end
+
+"""
+$(SIGNATURES)
+
+Returns the sliding-window entropy, normalized to have unit sum for each feature channel.
+"""
+function sliding_entropy_normalized(x::AbstractArray{T}, m=actuallastlength(x)) where T
+    sums = sum(x, dims=ndims(x))
+    sliding_entropy(x ./ sums, m)
 end

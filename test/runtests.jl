@@ -89,10 +89,12 @@ norm = x -> sqrt(sum(abs2, x))
 
     @testset "running stats" begin
         @info "Testing running stats"
+        l1 = l2 = 20
+        w = 4
         for l1 = [20,30]
             for l2 = [20,30]
-                x = randn(l1)
-                y = randn(l2)
+                x = rand(l1)
+                y = rand(l2)
                 for w = 4:2:10
                     mx,sx = sliding_mean_std(x, w)
                     @test length(mx) == length(sx) == length(x)-w+1
@@ -116,6 +118,43 @@ norm = x -> sqrt(sum(abs2, x))
                     @test D[1] == Inf # This is convention is this method to not return trivial matches
                     @test D[2] ≈ ZEuclidean()(y[1:w], y[1 .+ (1:w)]) atol=1e-5
                     @test D[5] ≈ ZEuclidean()(y[1:w], y[4 .+ (1:w)]) atol=1e-5
+
+                    entropy = x -> -sum(x.*log.(x))
+                    ent = sliding_entropy(x, w)
+                    @test length(ent) == length(x)-w+1
+                    @test ent[1] ≈ entropy(x[1:w])
+                    @test ent[2] ≈ entropy(x[2:w+1])
+
+                    sum1 = x -> x./sum(x)
+                    ent = sliding_entropy_normalized(x, w)
+                    @test length(ent) == length(x)-w+1
+                    @test ent[1] ≈ entropy(sum1(x)[1:w])
+                    @test ent[2] ≈ entropy(sum1(x)[2:w+1])
+
+                end
+
+                x = rand(2, l1)
+                y = rand(2, l2)
+                for w = 4:2:10
+                    mx,sx = sliding_mean_std(x, w)
+                    @test lastlength(mx) == lastlength(sx) == lastlength(x)-w+1
+                    @test mx[:,1] ≈ mean(x[:,1:w], dims=2)
+                    @test sx[:,1] ≈ std(x[:,1:w], dims=2, corrected=false)
+
+                    @test mx[:,2] ≈ mean(x[:,2:w+1], dims=2)
+                    @test sx[:,2] ≈ std(x[:,2:w+1], dims=2, corrected=false)
+
+                    entropy = x -> -sum(x.*log.(x))
+                    ent = sliding_entropy(x, w)
+                    @test length(ent) == lastlength(x)-w+1
+                    @test ent[1] ≈ entropy(x[:,1:w])
+                    @test ent[2] ≈ entropy(x[:,2:w+1])
+
+                    sum1 = x -> x./sum(x, dims=2)
+                    ent = sliding_entropy_normalized(x, w)
+                    @test length(ent) == lastlength(x)-w+1
+                    @test ent[1] ≈ entropy(sum1(x)[:,1:w])
+                    @test ent[2] ≈ entropy(sum1(x)[:,2:w+1])
 
                 end
             end
