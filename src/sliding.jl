@@ -143,19 +143,19 @@ end
     ss = zeros(T, size(x,1))
     μ = Matrix{float(T)}(undef, size(x,1), n)
     σ = Matrix{float(T)}(undef, size(x,1), n)
-    @simd for i = 1:m
-        s  .+= x[!,i]
-        ss .+= x[!,i].^2
+    for i = 1:m
+        @avx s  .+= view(x, :, i)
+        @avx ss .+= view(x, :, i).^2
     end
-    μ[!,1] = s./m
-    σ[!,1] = sqrt.(max.(ss./m .- μ[!,1].^2, 0))
+    @avx μ[:,1] .= s./m
+    @avx σ[:,1] .= sqrt.(max.(ss./m .- view(μ, :, 1).^2, 0))
     for i = 1:n-1 # fastmath making it more accurate here as well, but not faster
-        s .-= x[!,i]
-        ss .-= x[!,i].^2
-        s .+= x[!,i+m]
-        ss .+= x[!,i+m].^2
-        μ[!,i+1] = s./m
-        σ[!,i+1] = sqrt.(max.(ss./m .- μ[!,i+1].^2, 0))
+        @avx s .-= view(x, :, i)
+        @avx ss .-= view(x, :, i).^2
+        @avx s .+= view(x, :, i+m)
+        @avx ss .+= view(x, :, i+m).^2
+        @avx μ[:,i+1] .= s./m
+        @avx σ[:,i+1] .= sqrt.(max.(ss./m .- view(μ, :, i+1).^2, 0))
     end
     μ,σ
 end
@@ -192,15 +192,18 @@ function sliding_entropy(x::AbstractVecOrMat{T}, m=actuallastlength(x)) where T
     N = actuallastlength(x)
     n = N-m+1
     e = Vector{T}(undef, n)
-    ent = zeros(T, N)
-    x isa AbstractVector && (x = x')
-    @fastmath @inbounds for i = 1:N # TODO: add @avx after https://github.com/chriselrod/LoopVectorization.jl/issues/117
-        @simd for j = 1:size(x,1)
-            ent[i] += x[j,i]*log(x[j,i])
+    if x isa AbstractVector
+        ent = vmap(x->x*log(x), x)
+    else
+        ent = zeros(T, N)
+        @avx for i = 1:N
+            for j = 1:size(x,1)
+                ent[i] += x[j,i]*log(x[j,i])
+            end
         end
     end
     e0 = zero(T)
-    @fastmath @inbounds @simd for i = 1:m
+    @avx for i = 1:m
         e0 += ent[i]
     end
     e[1] = e0
