@@ -19,5 +19,5 @@ This package is used by
 - [MatrixProfile.jl](https://github.com/baggepinnen/MatrixProfile.jl)
 - [SpectralDistances.jl](https://github.com/baggepinnen/SpectralDistances.jl)
 
-Ad makes heavy use of
+And makes heavy use of
 - [LoopVectorization.jl](https://github.com/chriselrod/LoopVectorization.jl)

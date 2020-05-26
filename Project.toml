@@ -1,7 +1,7 @@
 name = "SlidingDistancesBase"
 uuid = "25b0cc0c-38e4-462f-a11d-8564868c562d"
 authors = ["Fredrik Bagge Carlson"]
-version = "0.1.4"
+version = "0.1.5"
 
 [deps]
 DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
@@ -14,7 +14,7 @@ UnsafeArrays = "c4a57d5a-5b31-53a6-b365-19f8c011fbd6"
 
 [compat]
 DSP = "0.6"
-Distances = "0.7, 0.8"
+Distances = "0.7, 0.8, 0.9"
 DocStringExtensions = "0.8"
 LoopVectorization = "0.7, 0.8"
 UnsafeArrays = "1.0"

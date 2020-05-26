@@ -8,7 +8,7 @@ export evaluate
 using Distances
 
 using LoopVectorization
-using DSP: conv
+using DSP
 
 
 export ZEuclidean
