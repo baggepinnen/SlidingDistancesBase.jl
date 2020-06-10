@@ -25,6 +25,11 @@ norm = x -> sqrt(sum(abs2, x))
         @test v[!,1] == [1 2 3; 1 2 3]
         @test v[!,1:2] == cat([1 2 3; 1 2 3], [1 2 3; 1 2 3], dims=3)
 
+        v = cat(v,v,dims=4)
+        @test v[!,1] == cat([1 2 3; 1 2 3], [1 2 3; 1 2 3], dims=3)
+
+        v[!,2] = zeros(2,3,2)
+        @test all(v[:,:,:,2] .== 0)
 
         v = collect(1:3)
         v[!,1] = 5
