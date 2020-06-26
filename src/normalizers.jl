@@ -39,7 +39,7 @@ setup_normalizer(n::Val{Nothing}, q, y) = n, q, y
 normalize(::Val{Nothing}, q) = q
 
 
-normalize(T::Type, q) = normalize(Val(T), q)
+normalize(T::Type, q) = normalize(Val(T), q) # TODO: use ::Type{T} instead and get rid of Val
 
 abstract type AbstractZNormalizer{T,N} <: AbstractNormalizer{T,N} end
 
@@ -181,7 +181,7 @@ end
 
 function normalize(::Val{IsoZNormalizer}, q::AbstractMatrix)
     q = q .- mean(q, dims=2) # TODO: this will cause a ton of allocations
-    q ./= std(q, dims=2, corrected=false)
+    q ./= (std(q, dims=2, corrected=false) .+ eps(eltype(q)))
 end
 
 setup_normalizer(z::Val{IsoZNormalizer}, q, y) = z, normalize(z, q), IsoZNormalizer(y, lastlength(q))
@@ -222,11 +222,11 @@ end
     z.x[i, xj]
 end
 
-@inline @propagate_inbounds function getindex(z::IsoZNormalizer, ::typeof(!), i, inorder = i == z.bufi + 1)
+@inline @propagate_inbounds function getindex(z::IsoZNormalizer{T}, ::typeof(!), i, inorder = i == z.bufi + 1) where T
     j = inorder ? i : z.n
     xj = z.i + i - 1
     @avx for k = 1:size(z.x, 1)
-        z.buffer[k, j] = (z.x[k, xj] - z.μ[k]) / z.σ[k]
+        z.buffer[k, j] = (z.x[k, xj] - z.μ[k]) / (z.σ[k] + eps(T))
     end
     if inorder
         z.bufi = i
