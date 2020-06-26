@@ -151,7 +151,7 @@ actuallastlength(x::AbstractZNormalizer) = lastlength(x.x)
 
 
 # Multi dim ==================================================================================
-mutable struct IsoZNormalizer{T} <: AbstractZNormalizer{T,2}
+mutable struct DiagonalZNormalizer{T} <: AbstractZNormalizer{T,2}
     x::Array{T,2}
     n::Int
     μ::Array{T,1}
@@ -165,7 +165,7 @@ end
 
 
 
-function IsoZNormalizer(x::AbstractArray{T,2}, n) where T
+function DiagonalZNormalizer(x::AbstractArray{T,2}, n) where T
     @assert length(x) >= n
     s  = zeros(T, size(x,1))
     ss = zeros(T, size(x,1))
@@ -176,19 +176,19 @@ function IsoZNormalizer(x::AbstractArray{T,2}, n) where T
     μ = s./n
     σ = sqrt.(ss./n .- μ.^2)
     buffer = similar(x, size(x,1), n)
-    IsoZNormalizer(x, n, μ, σ, s, ss, 0, buffer, 0)
+    DiagonalZNormalizer(x, n, μ, σ, s, ss, 0, buffer, 0)
 end
 
-function normalize(::Val{IsoZNormalizer}, q::AbstractMatrix)
+function normalize(::Val{DiagonalZNormalizer}, q::AbstractMatrix)
     q = q .- mean(q, dims=2) # TODO: this will cause a ton of allocations
     q ./= (std(q, dims=2, corrected=false) .+ eps(eltype(q)))
 end
 
-setup_normalizer(z::Val{IsoZNormalizer}, q, y) = z, normalize(z, q), IsoZNormalizer(y, lastlength(q))
-setup_normalizer(z::Val{ZNormalizer}, q::AbstractMatrix, y::AbstractMatrix) = setup_normalizer(Val(IsoZNormalizer), q, y) # Only need to expose ZNormalizer to the user
+setup_normalizer(z::Val{DiagonalZNormalizer}, q, y) = z, normalize(z, q), DiagonalZNormalizer(y, lastlength(q))
+setup_normalizer(z::Val{ZNormalizer}, q::AbstractMatrix, y::AbstractMatrix) = setup_normalizer(Val(DiagonalZNormalizer), q, y) # Only need to expose ZNormalizer to the user
 
 
-@propagate_inbounds function advance!(z::IsoZNormalizer{T}) where T
+@propagate_inbounds function advance!(z::DiagonalZNormalizer{T}) where T
 
     if z.i == 0
         return z.i = 1
@@ -214,7 +214,7 @@ end
 
 
 
-@inline @propagate_inbounds function getindex(z::IsoZNormalizer, i::Union{Number, AbstractRange}, j)
+@inline @propagate_inbounds function getindex(z::DiagonalZNormalizer, i::Union{Number, AbstractRange}, j)
     @boundscheck 1 <= j <= z.n || throw(BoundsError(z,j))
     @boundscheck 1 <= 1 <= size(z.x, 1) || throw(BoundsError(z,i))
     xj = j+z.i-1
@@ -222,7 +222,7 @@ end
     z.x[i, xj]
 end
 
-@inline @propagate_inbounds function getindex(z::IsoZNormalizer{T}, ::typeof(!), i, inorder = i == z.bufi + 1) where T
+@inline @propagate_inbounds function getindex(z::DiagonalZNormalizer{T}, ::typeof(!), i, inorder = i == z.bufi + 1) where T
     j = inorder ? i : z.n
     xj = z.i + i - 1
     @avx for k = 1:size(z.x, 1)
@@ -234,19 +234,19 @@ end
     z.buffer[!, j]
 end
 
-@inline @propagate_inbounds function getindex(z::IsoZNormalizer, ::typeof(!), i::AbstractRange)
+@inline @propagate_inbounds function getindex(z::DiagonalZNormalizer, ::typeof(!), i::AbstractRange)
     @boundscheck (i[1] == z.i && length(i) == z.n) || throw(ArgumentError("ZNormalizers can only be indexed by ranges corresponding to their current state. Got range $i but state was $(z.i) corresponding to range $(z.i):$(z.i+z.n-1)"))
     z
 end
 
-Base.Matrix(z::IsoZNormalizer) = z.x[:,z.i:z.i+z.n-1]
+Base.Matrix(z::DiagonalZNormalizer) = z.x[:,z.i:z.i+z.n-1]
 
-Base.length(z::IsoZNormalizer) = size(z.x,1) * z.n
-Base.size(z::IsoZNormalizer) = (size(z.x,1), z.n)
+Base.length(z::DiagonalZNormalizer) = size(z.x,1) * z.n
+Base.size(z::DiagonalZNormalizer) = (size(z.x,1), z.n)
 
 
 
-for T in [ZNormalizer, IsoZNormalizer]
+for T in [ZNormalizer, DiagonalZNormalizer]
     @eval @inline @propagate_inbounds function normalize(::Val{$T}, z::$T)
         if z.bufi == z.n
             return z.buffer

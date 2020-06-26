@@ -66,7 +66,7 @@ y = normalize(ZNormalizer, randn(10))
 
 n = 10
 x = randn(2,100)
-z = IsoZNormalizer(x,n)
+z = DiagonalZNormalizer(x,n)
 
 @test length(z) == 2n
 @test size(z) == (2,n)
@@ -103,7 +103,7 @@ inds = inds .+ 1
 @test z[1,1] == x[1,2]
 @test z[1:2,1] == x[1:2,2]
 
-@test normalize(IsoZNormalizer, z.x[:,2:11]) ≈ normalize(IsoZNormalizer, z)
+@test normalize(DiagonalZNormalizer, z.x[:,2:11]) ≈ normalize(DiagonalZNormalizer, z)
 
 for i = 1:89
     advance!(z)
@@ -113,7 +113,7 @@ end
 @test z[!, 1] ≈ (z[:,1]-mean(z))./std(z)
 @test z.bufi == 1
 
-@test normalize(IsoZNormalizer, z.x[:,91:end]) ≈ normalize(IsoZNormalizer, z) ≈ z.buffer
+@test normalize(DiagonalZNormalizer, z.x[:,91:end]) ≈ normalize(DiagonalZNormalizer, z) ≈ z.buffer
 @test z.bufi == n
 
 @test_throws BoundsError advance!(z)
@@ -121,6 +121,6 @@ end
 
 
 
-y = normalize(IsoZNormalizer, randn(2,10))
+y = normalize(DiagonalZNormalizer, randn(2,10))
 @test mean(y) ≈ 0 atol=1e-12
 @test std(y, corrected=false) ≈ 1 atol=1e-12
