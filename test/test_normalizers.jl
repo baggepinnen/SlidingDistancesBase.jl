@@ -83,8 +83,8 @@ inds = 1:n
 @test z[1:2,1] == x[1:2,1]
 
 
-@test @inferred(z[!,1]) == (x[:,1]-mean(z))./std(z)
-@test @inferred(z[!,n]) == (x[:,n]-mean(z))./std(z)
+@test @inferred(z[!,1]) ≈ (x[:,1]-mean(z))./std(z)
+@test @inferred(z[!,n]) ≈ (x[:,n]-mean(z))./std(z)
 
 advance!(z)
 inds = inds .+ 1
@@ -97,8 +97,8 @@ inds = inds .+ 1
 @test mean(z) ≈ mean(x[:, inds], dims=2)
 @test std(z) ≈ std(x[:, inds], dims=2, corrected=false)
 
-@test @inferred(z[!,1]) == (x[:,2]-mean(z))./std(z)
-@test @inferred(z[!,n]) == (x[:,n+1]-mean(z))./std(z)
+@test @inferred(z[!,1]) ≈ (x[:,2]-mean(z))./std(z)
+@test @inferred(z[!,n]) ≈ (x[:,n+1]-mean(z))./std(z)
 
 @test z[1,1] == x[1,2]
 @test z[1:2,1] == x[1:2,2]
