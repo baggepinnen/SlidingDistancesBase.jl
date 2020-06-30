@@ -132,6 +132,8 @@ y = normalize(DiagonalZNormalizer, randn(2,10))
 
 # NormNormalizer =============================================================================
 
+@test SlidingDistancesBase.setup_normalizer(NormNormalizer, [1 0.5], [1 0.5])[1] ≈ [1 0.5]./norm([1 0.5])
+@test SlidingDistancesBase.setup_normalizer(NormNormalizer, [1, 0.5], [1, 0.5])[1] ≈ [1, 0.5]./norm([1, 0.5])
 
 n = 10
 x = randn(2,100)

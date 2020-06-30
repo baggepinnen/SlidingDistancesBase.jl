@@ -246,30 +246,34 @@ Base.size(z::AbstractNormalizer{<:Any, 2}) = (size(z.x,1), z.n)
 
 
 # Norm normalizer dim ==================================================================================
-mutable struct NormNormalizer{T} <: AbstractNormalizer{T,2}
-    x::Array{T,2}
+mutable struct NormNormalizer{T,N} <: AbstractNormalizer{T,N}
+    x::Array{T,N}
     n::Int
     σ::T
     ss::T
     i::Int
-    buffer::Array{T,2}
+    buffer::Array{T,N}
     bufi::Int
 end
 
 
 
-function NormNormalizer(x::AbstractArray{T,2}, n) where T
+function NormNormalizer(x::AbstractArray{T,N}, n) where {T,N}
     @assert length(x) >= n
     ss = zero(T)
     @inbounds for i in 1:n
         ss += sum(abs2, x[!, i])
     end
     σ = sqrt(ss)
-    buffer = similar(x, size(x,1), n)
+    if N == 1
+        buffer = similar(x, n)
+    else
+        buffer = similar(x, size(x,1), n)
+    end
     NormNormalizer(x, n, σ, ss, 0, buffer, 0)
 end
 
-function normalize(::Type{NormNormalizer}, q::AbstractMatrix)
+function normalize(::Type{NormNormalizer}, q::AbstractArray)
     q ./ (norm(q) .+ eps(eltype(q)))
 end
 
@@ -313,7 +317,8 @@ end
 
 LinearAlgebra.norm(z::AbstractZNormalizer) = z.σ
 
-Base.length(z::NormNormalizer) = size(z.x,1) * z.n
+Base.length(z::NormNormalizer{<:Any,2}) = size(z.x,1) * z.n
+Base.length(z::NormNormalizer{<:Any,1}) = z.n
 SlidingDistancesBase.lastlength(z::NormNormalizer) = z.n
 actuallastlength(x::NormNormalizer) = lastlength(x.x)
 
