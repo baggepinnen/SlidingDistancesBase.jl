@@ -9,6 +9,7 @@ This package defines some common functionality used to calculate a distance betw
 - `distance_profile!(D, dist, query, timeseries)`
 - `ZEuclidean <: Distances.Metric` a Z-normalized Euclidean distance
 - `ZNormalizer` makes an array behave like each window into it is Z-normalized
+- `DiagonalZNormalizer` same as above, but for matrices and with a diagonal covariance matrix. 
 - `NormNormalizer` makes an array behave like each window into it has unit norm
 - `sliding_mean!`
 - `sliding_mean_std`

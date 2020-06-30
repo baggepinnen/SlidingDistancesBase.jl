@@ -183,7 +183,6 @@ function normalize(::Type{DiagonalZNormalizer}, q::AbstractMatrix)
 end
 
 setup_normalizer(z::Type{DiagonalZNormalizer}, q, y) = normalize(z, q), DiagonalZNormalizer(y, lastlength(q))
-setup_normalizer(z::Type{ZNormalizer}, q::AbstractMatrix, y::AbstractMatrix) = setup_normalizer(DiagonalZNormalizer, q, y) # Only need to expose ZNormalizer to the user
 
 
 @propagate_inbounds function advance!(z::DiagonalZNormalizer{T}) where T
@@ -302,7 +301,7 @@ setup_normalizer(z::Type{NormNormalizer}, q, y) = normalize(z, q), NormNormalize
 end
 
 
-@inline @propagate_inbounds function getindex(z::NormNormalizer{T}, ::typeof(!), i, inorder = i == z.bufi + 1) where T
+@inline @propagate_inbounds function getindex(z::NormNormalizer{T}, ::typeof(!), i::Int, inorder = i == z.bufi + 1) where T
     j = inorder ? i : z.n
     xj = z.i + i - 1
     σ = z.σ + eps(T)
