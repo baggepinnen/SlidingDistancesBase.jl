@@ -220,7 +220,7 @@ end
     z.x[i, xj]
 end
 
-@inline @propagate_inbounds function getindex(z::DiagonalZNormalizer{T}, ::typeof(!), i, inorder = i == z.bufi + 1) where T
+@inline @propagate_inbounds function getindex(z::DiagonalZNormalizer{T}, ::typeof(!), i::Int, inorder = i == z.bufi + 1) where T
     j = inorder ? i : z.n
     xj = z.i + i - 1
     @avx for k = 1:size(z.x, 1)
