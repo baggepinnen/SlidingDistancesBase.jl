@@ -1,9 +1,13 @@
 using Distances
 using Statistics
+using SlidingDistancesBase
+using SlidingDistancesBase: znorm
 
 @test advance!(0) == 0
-@test SlidingDistancesBase.setup_normalizer(Nothing, 1, 1) == (Nothing, 1, 1)
+@test SlidingDistancesBase.setup_normalizer(Nothing, 1, 1) == (1, 1)
 @test SlidingDistancesBase.normalize(Nothing, 1) == 1
+
+@test SlidingDistancesBase.setup_normalizer(ZNormalizer, [1,0.5], [1,0.5])[1] == znorm([1,0.5])
 
 n = 10
 x = randn(100)

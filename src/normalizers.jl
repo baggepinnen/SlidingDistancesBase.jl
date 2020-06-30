@@ -34,7 +34,7 @@ abstract type AbstractNormalizer{T,N} <: AbstractArray{T,N} end
 
 advance!(x) = 0 # Catches everything that's not a normalizer
 
-setup_normalizer(n::Type{Nothing}, q, y) = n, q, y
+setup_normalizer(n::Type{Nothing}, q, y) = q, y
 
 normalize(::Type{Nothing}, q) = q
 
@@ -89,7 +89,7 @@ function normalize(::Type{ZNormalizer}, q::AbstractVector)
     q ./= std(q, corrected=false, mean=0)
 end
 
-setup_normalizer(z::Type{ZNormalizer}, q::AbstractVector, y::AbstractVector) = z, normalize(z, q), ZNormalizer(y, length(q))
+setup_normalizer(z::Type{ZNormalizer}, q::AbstractVector, y::AbstractVector) = normalize(z, q), ZNormalizer(y, length(q))
 
 @propagate_inbounds function advance!(z::ZNormalizer{T}) where T
 
@@ -182,7 +182,7 @@ function normalize(::Type{DiagonalZNormalizer}, q::AbstractMatrix)
     q ./= (std(q, dims=2, corrected=false) .+ eps(eltype(q)))
 end
 
-setup_normalizer(z::Type{DiagonalZNormalizer}, q, y) = z, normalize(z, q), DiagonalZNormalizer(y, lastlength(q))
+setup_normalizer(z::Type{DiagonalZNormalizer}, q, y) = normalize(z, q), DiagonalZNormalizer(y, lastlength(q))
 setup_normalizer(z::Type{ZNormalizer}, q::AbstractMatrix, y::AbstractMatrix) = setup_normalizer(DiagonalZNormalizer, q, y) # Only need to expose ZNormalizer to the user
 
 
@@ -273,7 +273,7 @@ function normalize(::Type{NormNormalizer}, q::AbstractMatrix)
     q ./ (norm(q) .+ eps(eltype(q)))
 end
 
-setup_normalizer(z::Type{NormNormalizer}, q, y) = z, normalize(z, q), NormNormalizer(y, lastlength(q))
+setup_normalizer(z::Type{NormNormalizer}, q, y) = normalize(z, q), NormNormalizer(y, lastlength(q))
 
 
 @propagate_inbounds function advance!(z::NormNormalizer{T}) where T
