@@ -2,8 +2,8 @@ using Distances
 using Statistics
 
 @test advance!(0) == 0
-@test SlidingDistancesBase.setup_normalizer(Val(Nothing), 1, 1) == (Val(Nothing), 1, 1)
-@test SlidingDistancesBase.normalize(Val(Nothing), 1) == 1
+@test SlidingDistancesBase.setup_normalizer(Nothing, 1, 1) == (Nothing, 1, 1)
+@test SlidingDistancesBase.normalize(Nothing, 1) == 1
 
 n = 10
 x = randn(100)
