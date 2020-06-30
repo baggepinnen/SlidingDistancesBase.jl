@@ -1,6 +1,6 @@
 module SlidingDistancesBase
 
-using Statistics
+using Statistics, LinearAlgebra
 using UnsafeArrays
 using DocStringExtensions
 
@@ -21,7 +21,7 @@ export distance_profile, distance_profile!, sliding_mean_std, sliding_mean!, sli
 sliding_entropy_normalized
 include("sliding.jl")
 
-export AbstractNormalizer, ZNormalizer, DiagonalZNormalizer, normalize, znorm, meanstd, advance!
+export AbstractNormalizer, ZNormalizer, DiagonalZNormalizer, NormNormalizer, normalize, znorm, meanstd, advance!
 include("normalizers.jl")
 
 export AbstractSearchResult, BatchSearchResult, value, location, payload, target, targetlength

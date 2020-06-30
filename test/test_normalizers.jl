@@ -124,3 +124,61 @@ end
 y = normalize(DiagonalZNormalizer, randn(2,10))
 @test mean(y) ≈ 0 atol=1e-12
 @test std(y, corrected=false) ≈ 1 atol=1e-12
+
+
+# NormNormalizer =============================================================================
+
+
+n = 10
+x = randn(2,100)
+z = NormNormalizer(x,n)
+
+@test length(z) == 2n
+@test size(z) == (2,n)
+@test ndims(z) == 2
+@test actuallastlength(z) == size(z.x,2)
+
+advance!(z)  # Init
+inds = 1:n
+@test Matrix(z) == x[:,inds]
+@test z.i == 1
+@test z[1,1] == x[1,1]
+@test z[1:2,1] == x[1:2,1]
+
+
+@test @inferred(z[!,1]) ≈ (x[:,1])./norm(z)
+@test @inferred(z[!,n]) ≈ (x[:,n])./norm(z)
+
+advance!(z)
+inds = inds .+ 1
+
+@test z[1,1] == x[1,2]
+@test z[1:2,1] == x[1:2,2]
+
+@test z.i == 2
+@test Matrix(z) == x[:,inds]
+
+@test @inferred(z[!,1]) ≈ (x[:,2])./norm(z)
+@test @inferred(z[!,n]) ≈ (x[:,n+1])./norm(z)
+
+@test z[1,1] == x[1,2]
+@test z[1:2,1] == x[1:2,2]
+
+@test normalize(NormNormalizer, z.x[:,2:11]) ≈ normalize(NormNormalizer, z)
+
+for i = 1:89
+    advance!(z)
+end
+
+@test z.bufi == 0
+@test z[!, 1] ≈ (z[:,1])./norm(z)
+@test z.bufi == 1
+
+@test normalize(NormNormalizer, z.x[:,91:end]) ≈ normalize(NormNormalizer, z) ≈ z.buffer
+@test z.bufi == n
+
+@test_throws BoundsError advance!(z)
+
+
+y = normalize(NormNormalizer, randn(2,10))
+@test norm(y) ≈ 1 atol=1e-12

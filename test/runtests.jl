@@ -7,6 +7,12 @@ norm = x -> sqrt(sum(abs2, x))
 
 @testset "SlidingDistancesBase.jl" begin
 
+    @testset "Normalizers" begin
+        @info "Testing Normalizers"
+        include("test_normalizers.jl")
+
+    end
+
     @testset "utils" begin
         @info "Testing utils"
         @test floattype(Int) == Float64
@@ -197,14 +203,6 @@ norm = x -> sqrt(sum(abs2, x))
         @test pl[r] == pl[ind:ind+length(tg)-1]
         @test ["1","2","3","4"][r] == "3"
     end
-
-    @testset "Normalizers" begin
-        @info "Testing Normalizers"
-        include("test_normalizers.jl")
-
-    end
-
-
 
 end
 

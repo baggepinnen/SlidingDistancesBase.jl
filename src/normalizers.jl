@@ -214,7 +214,7 @@ end
 
 
 
-@inline @propagate_inbounds function getindex(z::DiagonalZNormalizer, i::Union{Number, AbstractRange}, j)
+@inline @propagate_inbounds function getindex(z::AbstractNormalizer{<:Any, 2}, i::Union{Number, AbstractRange}, j)
     @boundscheck 1 <= j <= z.n || throw(BoundsError(z,j))
     @boundscheck 1 <= 1 <= size(z.x, 1) || throw(BoundsError(z,i))
     xj = j+z.i-1
@@ -234,19 +234,96 @@ end
     z.buffer[!, j]
 end
 
-@inline @propagate_inbounds function getindex(z::DiagonalZNormalizer, ::typeof(!), i::AbstractRange)
-    @boundscheck (i[1] == z.i && length(i) == z.n) || throw(ArgumentError("ZNormalizers can only be indexed by ranges corresponding to their current state. Got range $i but state was $(z.i) corresponding to range $(z.i):$(z.i+z.n-1)"))
+@inline @propagate_inbounds function getindex(z::AbstractNormalizer{<:Any, 2}, ::typeof(!), i::AbstractRange)
+    @boundscheck (i[1] == z.i && length(i) == z.n) || throw(ArgumentError("Normalizers can only be indexed by ranges corresponding to their current state. Got range $i but state was $(z.i) corresponding to range $(z.i):$(z.i+z.n-1)"))
     z
 end
 
-Base.Matrix(z::DiagonalZNormalizer) = z.x[:,z.i:z.i+z.n-1]
+Base.Matrix(z::AbstractNormalizer{<:Any, 2}) = z.x[:,z.i:z.i+z.n-1]
 
 Base.length(z::DiagonalZNormalizer) = size(z.x,1) * z.n
-Base.size(z::DiagonalZNormalizer) = (size(z.x,1), z.n)
+Base.size(z::AbstractNormalizer{<:Any, 2}) = (size(z.x,1), z.n)
 
 
 
-for T in [ZNormalizer, DiagonalZNormalizer]
+
+# Norm normalizer dim ==================================================================================
+mutable struct NormNormalizer{T} <: AbstractNormalizer{T,2}
+    x::Array{T,2}
+    n::Int
+    σ::T
+    ss::T
+    i::Int
+    buffer::Array{T,2}
+    bufi::Int
+end
+
+
+
+function NormNormalizer(x::AbstractArray{T,2}, n) where T
+    @assert length(x) >= n
+    ss = zero(T)
+    @inbounds for i in 1:n
+        ss += sum(abs2, x[!, i])
+    end
+    σ = sqrt(ss)
+    buffer = similar(x, size(x,1), n)
+    NormNormalizer(x, n, σ, ss, 0, buffer, 0)
+end
+
+function normalize(::Val{NormNormalizer}, q::AbstractMatrix)
+    q ./ (norm(q) .+ eps(eltype(q)))
+end
+
+setup_normalizer(z::Val{NormNormalizer}, q, y) = z, normalize(z, q), NormNormalizer(y, lastlength(q))
+
+
+@propagate_inbounds function advance!(z::NormNormalizer{T}) where T
+
+    if z.i == 0
+        return z.i = 1
+    end
+    @boundscheck if z.i + z.n > length(z.x)
+        return z.i += 1
+    end
+    z.bufi = 0
+
+    # Remove old point
+    x = z.x[!, z.i]
+    z.ss -= sum(abs2, x)
+
+    # Add new point
+    x = z.x[!, z.i+z.n]
+    z.ss += sum(abs2, x)
+    z.σ = sqrt(z.ss)
+    z.i += 1
+end
+
+
+@inline @propagate_inbounds function getindex(z::NormNormalizer{T}, ::typeof(!), i, inorder = i == z.bufi + 1) where T
+    j = inorder ? i : z.n
+    xj = z.i + i - 1
+    σ = z.σ + eps(T)
+    @avx for k = 1:size(z.x, 1)
+        z.buffer[k, j] = z.x[k, xj] / σ
+    end
+    if inorder
+        z.bufi = i
+    end
+    z.buffer[!, j]
+end
+
+LinearAlgebra.norm(z::AbstractZNormalizer) = z.σ
+
+Base.length(z::NormNormalizer) = size(z.x,1) * z.n
+SlidingDistancesBase.lastlength(z::NormNormalizer) = z.n
+actuallastlength(x::NormNormalizer) = lastlength(x.x)
+
+
+
+# ============================================================================================
+
+for T in [ZNormalizer, DiagonalZNormalizer, NormNormalizer]
     @eval @inline @propagate_inbounds function normalize(::Val{$T}, z::$T)
         if z.bufi == z.n
             return z.buffer
