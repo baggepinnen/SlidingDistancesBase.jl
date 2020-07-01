@@ -58,15 +58,15 @@ Works like a vector, index into window with `z[i]`, index into normalized window
 - `buffer::Vector{T}`: stores calculated normalized values, do not access this, it might not be complete
 - `bufi::Int`: index of last normalized value
 """
-mutable struct ZNormalizer{T} <: AbstractZNormalizer{T,1}
-    x::Vector{T}
+mutable struct ZNormalizer{T,N} <: AbstractZNormalizer{T,N}
+    x::Array{T,N}
     n::Int
     μ::T
     σ::T
     s::T
     ss::T
     i::Int
-    buffer::Vector{T}
+    buffer::Array{T,N}
     bufi::Int
 end
 
@@ -83,16 +83,29 @@ function ZNormalizer(x::AbstractVector{T}, n) where T
     ZNormalizer(x, n, μ, σ, s, ss, 0, buffer, 0)
 end
 
+function ZNormalizer(x::AbstractMatrix{T}, n) where T
+    @assert length(x) >= n
+    m = size(x,1)*n
+    s = ss = zero(T)
+    for i in 1:n
+        s += sum(x[!,i])
+        ss += sum(abs2, x[!,i])
+    end
+    μ = s/m
+    σ = sqrt(ss/m - μ^2)
+    buffer = similar(x, size(x,1), n)
+    ZNormalizer(x, n, μ, σ, s, ss, 0, buffer, 0)
+end
 
-function normalize(::Type{ZNormalizer}, q::AbstractVector)
+
+function normalize(::Type{ZNormalizer}, q::AbstractArray)
     q = q .- mean(q)
     q ./= std(q, corrected=false, mean=0)
 end
 
-setup_normalizer(z::Type{ZNormalizer}, q::AbstractVector, y::AbstractVector) = normalize(z, q), ZNormalizer(y, length(q))
+setup_normalizer(z::Type{ZNormalizer}, q::AbstractVecOrMat, y::AbstractVecOrMat) = normalize(z, q), ZNormalizer(y, lastlength(q))
 
-@propagate_inbounds function advance!(z::ZNormalizer{T}) where T
-
+@propagate_inbounds function advance!(z::ZNormalizer{T,1}) where T
     if z.i == 0
         return z.i = 1
     end
@@ -111,19 +124,43 @@ setup_normalizer(z::Type{ZNormalizer}, q::AbstractVector, y::AbstractVector) = n
     z.s += x
     z.ss += x^2
     z.μ = z.s/z.n
-    z.σ = sqrt(z.ss/z.n - z.μ^2)
+    z.σ = sqrt(max(z.ss/z.n - z.μ^2, 0))
+    z.i += 1
+end
+
+@propagate_inbounds function advance!(z::ZNormalizer{T,2}) where T
+    if z.i == 0
+        return z.i = 1
+    end
+    @boundscheck if z.i + z.n > lastlength(z.x)
+        return z.i += 1
+    end
+    z.bufi = 0
+
+    # Remove old point
+    x = z.x[!, z.i]
+    z.s -= sum(x)
+    z.ss -= sum(abs2, x)
+
+    # Add new point
+    x = z.x[!, z.i+z.n]
+    z.s += sum(x)
+    z.ss += sum(abs2, x)
+    m = length(z)
+    z.μ = z.s/m
+    z.σ = sqrt(max(z.ss/m - z.μ^2, 0))
     z.i += 1
 end
 
 
-@inline @propagate_inbounds function getindex(z::ZNormalizer, i)
+@inline @propagate_inbounds function getindex(z::ZNormalizer{<:Any, 1}, i)
     @boundscheck 1 <= i <= z.n || throw(BoundsError(z,i))
     xi = i+z.i-1
     @boundscheck xi <= length(z.x) || throw(BoundsError(z,i))
     z.x[xi]
 end
 
-@inline @propagate_inbounds function getindex(z::ZNormalizer, ::typeof(!), i::Int, inorder = i == z.bufi + 1)
+@inline @propagate_inbounds function getindex(z::ZNormalizer{<:Any, 1}, ::typeof(!), i::Int, inorder = i == z.bufi + 1)
     y = (z[i]-z.μ) / z.σ
     if inorder
         z.bufi = i
@@ -132,17 +169,30 @@ end
     y
 end
 
-@inline @propagate_inbounds function getindex(z::ZNormalizer, ::typeof(!), i::AbstractRange)
+@inline @propagate_inbounds function getindex(z::ZNormalizer{<:Any, 1}, ::typeof(!), i::AbstractRange)
     @boundscheck (i[1] == z.i && length(i) == z.n) || throw(ArgumentError("ZNormalizers can only be indexed by ranges corresponding to their current state. Got range $i but state was $(z.i) corresponding to range $(z.i):$(z.i+z.n-1)"))
     z
+end
+
+@inline @propagate_inbounds function getindex(z::ZNormalizer{T,2}, ::typeof(!), i::Int, inorder = i == z.bufi + 1) where T
+    j = inorder ? i : z.n
+    xj = z.i + i - 1
+    μ,σ = z.μ, z.σ + eps(T)
+    @avx for k = 1:size(z.x, 1)
+        z.buffer[k, j] = (z.x[k, xj] - μ) / σ
+    end
+    if inorder
+        z.bufi = i
+    end
+    z.buffer[!, j]
 end
 
 Statistics.mean(z::AbstractZNormalizer) = z.μ
 Statistics.std(z::AbstractZNormalizer) = z.σ
 
 SlidingDistancesBase.lastlength(z::AbstractZNormalizer) = z.n
-Base.length(z::AbstractZNormalizer) = z.n
-Base.size(z::ZNormalizer) = (z.n,)
+Base.length(z::AbstractZNormalizer) = length(z.buffer)
+Base.size(z::ZNormalizer, args...) = size(z.buffer, args...)
 actuallastlength(x::AbstractZNormalizer) = lastlength(x.x)
 
 
@@ -172,7 +222,7 @@ function DiagonalZNormalizer(x::AbstractArray{T,2}, n) where T
         ss .+= x[!, i].^2
     end
     μ = s./n
-    σ = sqrt.(ss./n .- μ.^2)
+    σ = sqrt.(max.(ss./n .- μ.^2, 0))
     buffer = similar(x, size(x,1), n)
     DiagonalZNormalizer(x, n, μ, σ, s, ss, 0, buffer, 0)
 end
@@ -240,6 +290,7 @@ Base.Matrix(z::AbstractNormalizer{<:Any, 2}) = z.x[:,z.i:z.i+z.n-1]
 
 Base.length(z::DiagonalZNormalizer) = size(z.x,1) * z.n
 Base.size(z::AbstractNormalizer{<:Any, 2}) = (size(z.x,1), z.n)
+
 
 
 
