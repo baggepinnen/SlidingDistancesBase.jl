@@ -38,6 +38,9 @@ setup_normalizer(n::Type{Nothing}, q, y) = q, y
 
 normalize(::Type{Nothing}, q) = q
 
+(z::AbstractNormalizer)(q) = normalize(z, q)
+(::Type{N})(q) where N <: AbstractNormalizer = normalize(N, q)
+
 
 abstract type AbstractZNormalizer{T,N} <: AbstractNormalizer{T,N} end
 
@@ -295,8 +298,11 @@ Base.size(z::AbstractNormalizer{<:Any, 2}) = (size(z.x,1), z.n)
 
 
 
-# Norm normalizer dim ==================================================================================
-mutable struct NormNormalizer{T,N} <: AbstractNormalizer{T,N}
+# Norm normalizer ==================================================================================
+
+abstract type AbstractNormNormalizer{T,N} <: AbstractNormalizer{T,N} end
+
+mutable struct NormNormalizer{T,N} <: AbstractNormNormalizer{T,N}
     x::Array{T,N}
     n::Int
     σ::T
@@ -306,6 +312,15 @@ mutable struct NormNormalizer{T,N} <: AbstractNormalizer{T,N}
     bufi::Int
 end
 
+mutable struct SqNormNormalizer{T,N} <: AbstractNormNormalizer{T,N}
+    x::Array{T,N}
+    n::Int
+    σ::T
+    ss::T
+    i::Int
+    buffer::Array{T,N}
+    bufi::Int
+end
 
 
 function NormNormalizer(x::AbstractArray{T,N}, n) where {T,N}
@@ -323,14 +338,31 @@ function NormNormalizer(x::AbstractArray{T,N}, n) where {T,N}
     NormNormalizer(x, n, σ, ss, 0, buffer, 0)
 end
 
-function normalize(::Type{NormNormalizer}, q::AbstractArray)
-    q ./ (norm(q) .+ eps(eltype(q)))
+function SqNormNormalizer(x::AbstractArray{T,N}, n) where {T,N}
+    @assert length(x) >= n
+    ss = zero(T)
+    @inbounds for i in 1:n
+        ss += sum(abs2, x[!, i])
+    end
+    σ = ss
+    if N == 1
+        buffer = similar(x, n)
+    else
+        buffer = similar(x, size(x,1), n)
+    end
+    SqNormNormalizer(x, n, σ, ss, 0, buffer, 0)
 end
 
-setup_normalizer(z::Type{NormNormalizer}, q, y) = normalize(z, q), NormNormalizer(y, lastlength(q))
+function normalize(::Type{N}, q::AbstractArray) where N <: AbstractNormNormalizer
+    power = N == NormNormalizer ? 1 : 2
+    q ./ (norm(q)^power .+ eps(eltype(q)))
+end
 
 
-@propagate_inbounds function advance!(z::NormNormalizer{T}) where T
+setup_normalizer(z::Type{N}, q, y) where N <: AbstractNormNormalizer = normalize(N, q), N(y, lastlength(q))
+
+
+@propagate_inbounds function advance!(z::AbstractNormNormalizer{T}) where T
 
     if z.i == 0
         return z.i = 1
@@ -347,12 +379,12 @@ setup_normalizer(z::Type{NormNormalizer}, q, y) = normalize(z, q), NormNormalize
     # Add new point
     x = z.x[!, z.i+z.n]
     z.ss += sum(abs2, x)
-    z.σ = sqrt(z.ss)
+    z.σ = z isa SqNormNormalizer ? z.ss : sqrt(z.ss)
     z.i += 1
 end
 
 
-@inline @propagate_inbounds function getindex(z::NormNormalizer{T}, ::typeof(!), i::Int, inorder = i == z.bufi + 1) where T
+@inline @propagate_inbounds function getindex(z::AbstractNormNormalizer{T}, ::typeof(!), i::Int, inorder = i == z.bufi + 1) where T
     j = inorder ? i : z.n
     xj = z.i + i - 1
     σ = z.σ + eps(T)
@@ -365,18 +397,19 @@ end
     z.buffer[!, j]
 end
 
-LinearAlgebra.norm(z::AbstractZNormalizer) = z.σ
+LinearAlgebra.norm(z::NormNormalizer) = z.σ
+LinearAlgebra.norm(z::SqNormNormalizer) = sqrt(z.σ)
 
-Base.length(z::NormNormalizer{<:Any,2}) = size(z.x,1) * z.n
-Base.length(z::NormNormalizer{<:Any,1}) = z.n
-SlidingDistancesBase.lastlength(z::NormNormalizer) = z.n
-actuallastlength(x::NormNormalizer) = lastlength(x.x)
+Base.length(z::AbstractNormNormalizer{<:Any,2}) = size(z.x,1) * z.n
+Base.length(z::AbstractNormNormalizer{<:Any,1}) = z.n
+SlidingDistancesBase.lastlength(z::AbstractNormNormalizer) = z.n
+actuallastlength(x::AbstractNormNormalizer) = lastlength(x.x)
 
 
 
 # ============================================================================================
 
-for T in [ZNormalizer, DiagonalZNormalizer, NormNormalizer]
+for T in [ZNormalizer, DiagonalZNormalizer, NormNormalizer, SqNormNormalizer]
     @eval @inline @propagate_inbounds function normalize(::Type{$T}, z::$T)
         if z.bufi == z.n
             return z.buffer

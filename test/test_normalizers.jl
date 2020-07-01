@@ -245,3 +245,63 @@ end
 
 y = normalize(NormNormalizer, randn(2,10))
 @test norm(y) ≈ 1 atol=1e-12
+
+
+# SqNormNormalizer =============================================================================
+
+@test SlidingDistancesBase.setup_normalizer(SqNormNormalizer, [1 0.5], [1 0.5])[1] ≈ [1 0.5]./norm([1 0.5])^2
+@test SlidingDistancesBase.setup_normalizer(SqNormNormalizer, [1, 0.5], [1, 0.5])[1] ≈ [1, 0.5]./norm([1, 0.5])^2
+
+n = 10
+x = randn(2,100)
+z = SqNormNormalizer(x,n)
+
+@test length(z) == 2n
+@test size(z) == (2,n)
+@test ndims(z) == 2
+@test actuallastlength(z) == size(z.x,2)
+
+advance!(z)  # Init
+inds = 1:n
+@test Matrix(z) == x[:,inds]
+@test z.i == 1
+@test z[1,1] == x[1,1]
+@test z[1:2,1] == x[1:2,1]
+
+
+@test @inferred(z[!,1]) ≈ (x[:,1])./norm(z)^2
+@test @inferred(z[!,n]) ≈ (x[:,n])./norm(z)^2
+
+advance!(z)
+inds = inds .+ 1
+
+@test z[1,1] == x[1,2]
+@test z[1:2,1] == x[1:2,2]
+
+@test z.i == 2
+@test Matrix(z) == x[:,inds]
+
+@test @inferred(z[!,1]) ≈ (x[:,2])./norm(z)^2
+@test @inferred(z[!,n]) ≈ (x[:,n+1])./norm(z)^2
+
+@test z[1,1] == x[1,2]
+@test z[1:2,1] == x[1:2,2]
+
+@test normalize(SqNormNormalizer, z.x[:,2:11]) ≈ normalize(SqNormNormalizer, z)
+
+for i = 1:89
+    advance!(z)
+end
+
+@test z.bufi == 0
+@test z[!, 1] ≈ (z[:,1])./norm(z)^2
+@test z.bufi == 1
+
+@test normalize(SqNormNormalizer, z.x[:,91:end]) ≈ normalize(SqNormNormalizer, z) ≈ z.buffer
+@test z.bufi == n
+
+@test_throws BoundsError advance!(z)
+
+
+# y = normalize(SqNormNormalizer, randn(2,10))
+# @test √norm(y) ≈ 1 atol=1e-12
