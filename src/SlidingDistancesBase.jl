@@ -1,7 +1,6 @@
 module SlidingDistancesBase
 
 using Statistics, LinearAlgebra
-using UnsafeArrays
 using DocStringExtensions
 
 export evaluate

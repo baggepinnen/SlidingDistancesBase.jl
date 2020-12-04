@@ -4,14 +4,14 @@ floattype(T::Type{<:AbstractFloat}) = T
 floattype(_) = Float64
 
 Base.@propagate_inbounds @inline Base.getindex(v::AbstractVector, ::typeof(!), i) = v[i]
-Base.@propagate_inbounds @inline Base.getindex(v::AbstractVector, ::typeof(!), i::AbstractRange) = uview(v, i)
-Base.@propagate_inbounds @inline Base.getindex(v::AbstractMatrix, ::typeof(!), i) = uview(v,:,i)
-Base.@propagate_inbounds @inline Base.getindex(v::AbstractArray, ::typeof(!), i) = uview(v, Base.front(ntuple(i -> Colon(), ndims(v)))..., i)
+Base.@propagate_inbounds @inline Base.getindex(v::AbstractVector, ::typeof(!), i::AbstractRange) = view(v, i)
+Base.@propagate_inbounds @inline Base.getindex(v::AbstractMatrix, ::typeof(!), i) = view(v,:,i)
+Base.@propagate_inbounds @inline Base.getindex(v::AbstractArray, ::typeof(!), i) = view(v, Base.front(ntuple(i -> Colon(), ndims(v)))..., i)
 
 Base.@propagate_inbounds @inline Base.setindex!(v::AbstractVector, val, ::typeof(!), i) = v[i] = val
 Base.@propagate_inbounds @inline Base.setindex!(v::AbstractVector, val, ::typeof(!), i::AbstractRange) = v[i] .= val
 Base.@propagate_inbounds @inline Base.setindex!(v::AbstractMatrix, val, ::typeof(!), i) = v[:,i] .= val
-Base.@propagate_inbounds @inline Base.setindex!(v::AbstractArray, val, ::typeof(!), i) = uview(v, Base.front(ntuple(i -> Colon(), ndims(v)))..., i) .= val
+Base.@propagate_inbounds @inline Base.setindex!(v::AbstractArray, val, ::typeof(!), i) = view(v, Base.front(ntuple(i -> Colon(), ndims(v)))..., i) .= val
 
 "Return the length of the last axis"
 lastlength(x) = size(x, ndims(x))
