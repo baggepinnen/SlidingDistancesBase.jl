@@ -37,9 +37,15 @@ end
 "$(SIGNATURES)"
 function distance_profile!(D::AbstractVector{S},::ZEuclidean, QT::AbstractVector{S}, μ, σ, m::Int, i::Int) where S <: Number
     @assert i <= length(D)
-    @avx for j = eachindex(D)
-        frac = (QT[j] - m*μ[i]*μ[j]) / (m*σ[i]*σ[j])
-        D[j] = sqrt(max(2m*(1-frac), 0))
+    mμ = m*μ[i]
+    mσ = m*σ[i]
+    O = zero(S)
+    # @inbounds @fastmath @simd for j = eachindex(D)
+    @avx unroll=4 for j = eachindex(D)
+        # frac = (QT[j] - mμ*μ[j]) / (mσ*σ[j])
+        # frac = (QT[j] - mμ*μ[j]) * Base.FastMath.inv_fast(mσ*σ[j])
+        frac = (QT[j] - mμ*μ[j]) * LoopVectorization.VectorizationBase.vinv_fast(mσ*σ[j])
+        D[j] = sqrt(max(2m*(1-frac), O))
     end
     D[i] = typemax(eltype(D))
     D
@@ -246,7 +252,7 @@ function sliding_pca(X::AbstractMatrix{A}; fs, w = 0.3, cutoff_freq = 0, pad = t
     mX = mean(X, dims=2)
     X = X .- mX
     if cutoff_freq > 0
-        X = filtfilt(digitalfilter(Highpass(cutoff_freq; fs), Butterworth(6)), X')'
+        X = filtfilt(digitalfilter(Highpass(cutoff_freq; fs=fs), Butterworth(6)), X')'
     end
 
     win = 1:w
@@ -270,7 +276,7 @@ function sliding_pca(X::AbstractMatrix{A}; fs, w = 0.3, cutoff_freq = 0, pad = t
         win = win .+ 1
     end
     if cutoff_freq > 0
-        directions = filtfilt(digitalfilter(Lowpass(cutoff_freq; fs), Butterworth(4)), directions')'
+        directions = filtfilt(digitalfilter(Lowpass(cutoff_freq; fs=fs), Butterworth(4)), directions')'
     end
     for i = axes(directions, 2)
         @views directions[:,i] ./= norm(directions[:,i])    
@@ -295,3 +301,40 @@ function _maindir!(x, last, normalize_win)
     end
     v
 end
+
+# function sliding_pca2(X::AbstractMatrix{A}; dout = 1, l=2) where A
+#     d, N = size(X)
+#     λ   = zeros(A, dout)
+#     V   = zeros(A, d, dout, N)
+#     μ   = zeros(A, d)
+#     xi  = zeros(A, d)
+#     v   = zeros(A, d)
+#     U   = zeros(A, dout, N)
+#     n   = 0
+    
+#     for x in eachcol(X)
+
+#         n += 1
+#         @. μ += (x - μ) / n
+#         xi = (n > 1) ? (x .- μ) : deepcopy(x)
+#         f = (one(A)+l)/n
+#         @views if n > 1
+#             V[:, :, n] .= V[:, :, n-1]
+#         end
+#         @views @inbounds for i in 1:dout
+#             if i == n
+#                 λ[i] = norm(xi)
+#                 @. V[:, i, n] = xi / (λ[i] + eps())
+#                 break
+#             end
+#             v .= ((1-f) * λ[i]) .* V[:, i, n] .+ (f * dot(V[:, i, n], xi)) .* xi
+#             λ[i] = norm(v)
+#             @. V[:, i, n] = v/(λ[i] + eps())
+#             xi .= xi .- dot(V[:, i, n], xi) .* V[:, i]
+#         end
+#         @views mul!(U[:, n], V[:, :, n]', xi)
+#         U[:, n] .*= λ
+#     end
+#     U, V
+
+# end
