@@ -224,3 +224,74 @@ function sliding_entropy_normalized(x::AbstractArray{T}, m=actuallastlength(x)) 
     sums = sum(x, dims=ndims(x))
     sliding_entropy(x ./ sums, m)
 end
+
+
+"""
+    $(SIGNATURES)
+
+Sliding-window PCA. Returns `U1 ∈ 𝐑(N)` the main principal-component loading scaled with the singular value, and `V1 ∈ 𝐑(d × N)` the main principal direction.
+
+# Arguments:
+- `X`: Signal ∈ 𝐑(d × N)
+- `fs`: Sampling frequency
+- `w`: Window length in seconds
+- `cutoff_freq`: Frequencies below this will be removed. Set to 0 to avoid filtering.
+- `pad`: if true, the return value will be padded with zeros to account for the fact that the analysis uses sliding windows and produce a slightly shorter output. If `pad = true`, the output will have the same length as the input.
+- `normalize_win`: remove the mean from each window before calculating svd.
+- `center`: Index into `X` at the center of the window (default) or at a position in the window proportional to how far along in the signal the window is taken. 
+"""
+function sliding_pca(X::AbstractMatrix{A}; fs, w = 0.3, cutoff_freq = 0, pad = true, normalize_win=false, center = true) where A
+    w = round(Int, w*fs) # from seconds to samples
+    d,N = size(X)
+    mX = mean(X, dims=2)
+    X = X .- mX
+    if cutoff_freq > 0
+        X = filtfilt(digitalfilter(Highpass(cutoff_freq; fs), Butterworth(6)), X')'
+    end
+
+    win = 1:w
+    dominant_mode = Vector{A}(undef, N-w+1)
+    directions = Matrix{A}(undef, d, N-w+1)
+    d1 = zeros(A, d); d1[1] = 1
+    wininds = range(1, stop = w, length = N-w+1)
+    for i = 1:N-w+1
+        v = _maindir!(X[:, win], i == 1 ? d1 : @view(directions[:, i-1]), normalize_win)
+        directions[:,i] .= v
+        if center
+            ii = (win[1] + win[end]) ÷ 2 + 1 # integer index from middle of window
+            @views dominant_mode[i] = v'X[:, ii]
+        else
+            ii = i + wininds[i] - 1
+            ib = floor(Int, ii)
+            ia = ceil(Int, ii)
+            α = ia - ii
+            @views dominant_mode[i] = v'*((1-α) .* X[:, ib] .+ (α) .* X[:,ia]) # interpolate
+        end
+        win = win .+ 1
+    end
+    if cutoff_freq > 0
+        directions = filtfilt(digitalfilter(Lowpass(cutoff_freq; fs), Butterworth(4)), directions')'
+    end
+    for i = axes(directions, 2)
+        @views directions[:,i] ./= norm(directions[:,i])    
+    end    
+    if pad
+        dominant_mode = [zeros(w÷2); dominant_mode; zeros(w÷2-1)]
+        directions = [repeat(directions[:,1], 1, w÷2) directions repeat(directions[:,1], 1, w÷2-1)]
+        directions
+    end
+    dominant_mode, directions
+end
+
+function _maindir!(x, last, normalize_win)
+    if normalize_win
+        x .-= mean(x, dims = 1)
+    end
+    s = svd!(x, alg = LinearAlgebra.QRIteration()) # alg choice important for stability of singular vectors
+    V = s.U
+    v = V[1,:] 
+    if dot(last, v) < 0
+        v .*= -1
+    end
+    v
+end

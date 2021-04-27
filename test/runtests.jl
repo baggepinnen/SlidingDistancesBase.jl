@@ -204,6 +204,27 @@ norm = x -> sqrt(sum(abs2, x))
         @test ["1","2","3","4"][r] == "3"
     end
 
+    @testset "Sliding PCA" begin
+        @info "Testing Sliding PCA"
+
+        t = 0:0.1:100
+        x = sin.(t)
+        X = [x 0*x 0*x]'
+        U1, V1 = sliding_pca(X; fs=10, w=1, center=true)
+        @test size(V1) == size(X)
+        @test length(U1) == length(t)
+        @test all(V1[1,:] .≈ 1)
+        @test norm(U1-x)/norm(x) < 0.07
+
+        U1, V1 = sliding_pca(X; fs=10, w=1, center=false)
+        @test norm(U1-x)/norm(x) < 0.3
+
+        X = [x x 0*x]'
+        U1, V1 = sliding_pca(X; fs=10, w=1)
+        @test all(V1[3,:] .≈ 0)
+
+    end
+
 end
 
 
