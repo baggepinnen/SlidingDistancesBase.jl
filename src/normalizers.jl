@@ -81,7 +81,7 @@ function ZNormalizer(x::AbstractVector{T}, n) where T
         ss += x[i]^2
     end
     μ = s/n
-    σ = sqrt(ss/n - μ^2)
+    σ = sqrt(max(0, ss/n - μ^2))
     buffer = similar(x, n)
     ZNormalizer(x, n, μ, σ, s, ss, 0, buffer, 0)
 end
@@ -95,7 +95,7 @@ function ZNormalizer(x::AbstractMatrix{T}, n) where T
         ss += sum(abs2, x[!,i])
     end
     μ = s/m
-    σ = sqrt(ss/m - μ^2)
+    σ = sqrt(max(0, ss/m - μ^2))
     buffer = similar(x, size(x,1), n)
     ZNormalizer(x, n, μ, σ, s, ss, 0, buffer, 0)
 end
