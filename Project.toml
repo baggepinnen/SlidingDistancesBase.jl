@@ -1,7 +1,7 @@
 name = "SlidingDistancesBase"
 uuid = "25b0cc0c-38e4-462f-a11d-8564868c562d"
 authors = ["Fredrik Bagge Carlson"]
-version = "0.3.1"
+version = "0.3.2"
 
 [deps]
 DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
