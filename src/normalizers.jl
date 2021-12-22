@@ -87,7 +87,7 @@ function ZNormalizer(x::AbstractVector{T}, n) where T
 end
 
 function ZNormalizer(x::AbstractMatrix{T}, n) where T
-    @assert length(x) >= n
+    @assert lastlength(x) >= n
     m = size(x,1)*n
     s = ss = zero(T)
     for i in 1:n
@@ -324,7 +324,8 @@ end
 
 
 function NormNormalizer(x::AbstractArray{T,N}, n) where {T,N}
-    @assert length(x) >= n
+    # @assert lastlength(x) >= n
+    n = min(n, lastlength(x))
     ss = zero(T)
     @inbounds for i in 1:n
         ss += sum(abs2, x[!, i])
@@ -408,15 +409,20 @@ actuallastlength(x::AbstractNormNormalizer) = lastlength(x.x)
 
 
 # ============================================================================================
-
 for T in [ZNormalizer, DiagonalZNormalizer, NormNormalizer, SqNormNormalizer]
     @eval @inline @propagate_inbounds function normalize(::Type{$T}, z::$T)
         if z.bufi == z.n
             return z.buffer
         end
+        z.i == 0 && (z.i += 1)
         for i = z.bufi+1:z.n
             z[!, i, true] # This populates the buffer
         end
         return z.buffer
     end
+
+    @eval setup_normalizer(z::Type{$T}, q::$T, y) = normalize(z, q), $T(y, lastlength(q))
+    # @eval setup_normalizer(n::Type{$T}, q::$T, y::$T) = q, y # NOTE: to use those safely they might have to be reset after having been used once
+    # @eval setup_normalizer(z::Type{$T}, q, y::$T) = normalize(z, q), y
+
 end
