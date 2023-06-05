@@ -15,6 +15,7 @@ This package defines some common functionality used to calculate a distance betw
 - `sliding_mean!`
 - `sliding_mean_std`
 - `sliding_entropy / sliding_entropy_normalized`
+- `sliding_pca`
 
 
 This package is used by
