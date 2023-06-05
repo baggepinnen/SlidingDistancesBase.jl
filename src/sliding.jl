@@ -166,6 +166,39 @@ end
     μ,σ
 end
 
+
+"""
+    sliding_mean_std(x::AbstractVector{T}, kb, kf)
+
+Return sliding mean and variance over windows of length `kb + kf + 1`, where `kb` data points before and `kf` after the center of the window are used.
+
+The returned arrays will have the same lengths as the input `x`.
+"""
+function sliding_mean_std(x::AbstractVector{T}, kb, kf) where T
+    n = length(x)
+    s = ss = zero(float(T))
+    μ = zeros(float(T), n)
+    σ = zeros(float(T), n)
+    for i = 1:kf
+        s  += x[i]
+        ss += x[i]^2
+    end
+    for i = 1:n
+        m = min(i+kf, n) - max(i-kb, 1) + 1
+        if i+kf <= n
+            s += x[i+kf]
+            ss += x[i+kf]^2
+        end
+        μ[i] = s/m
+        σ[i] = sqrt(max(ss/m - μ[i]^2, 0))
+        if i-kb > 0
+            s -= x[i-kb]
+            ss -= x[i-kb]^2
+        end
+    end
+    μ,σ
+end
+
 """
     $(SIGNATURES)
 
