@@ -170,6 +170,17 @@ norm = x -> sqrt(sum(abs2, x))
                 end
             end
         end
+
+        A = [4 8 6 -1 -2 -3 -1 3 4 5][:]
+        mu, sig = sliding_mean_std(A, 2, 0); mu
+        @test mu ≈ [4; 6; 6; 4.3333; 1; -2; -2; -0.3333; 2; 4] atol=1e-4
+
+        mu, sig = sliding_mean_std(A, 2, 1); mu
+        for i = eachindex(A)
+            inds = filter(i->i ∈ eachindex(A), (-2:1) .+ i)
+            @test mu[i] ≈ sum(A[inds])/length(inds) atol=1e-4
+        end
+
     end
 
 
