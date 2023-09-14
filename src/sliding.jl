@@ -35,17 +35,28 @@ function distance_profile!(D::AbstractArray, dist, Q::AbstractArray{S}, T::Abstr
 end
 
 "$(SIGNATURES)"
-function distance_profile!(D::AbstractVector{S},::ZEuclidean, QT::AbstractVector{S}, μ, σ, m::Int, i::Int) where S <: Number
+function distance_profile!(D::AbstractVector{S},::ZEuclidean, QT::AbstractVector{S}, μ, σ, m::Int, i::Int; exclusion_zone = 0) where S <: Number
     @assert i <= length(D)
     mμ = m*μ[i]
     mσ = m*σ[i]
     O = zero(S)
     # @inbounds @fastmath @simd for j = eachindex(D)
-    @avx unroll=4 for j = eachindex(D)
-        # frac = (QT[j] - mμ*μ[j]) / (mσ*σ[j])
-        # frac = (QT[j] - mμ*μ[j]) * Base.FastMath.inv_fast(mσ*σ[j])
-        frac = (QT[j] - mμ*μ[j]) * LoopVectorization.VectorizationBase.vinv_fast(mσ*σ[j])
-        D[j] = sqrt(max(2m*(1-frac), O))
+    if exclusion_zone > 0
+        for j = eachindex(D)
+            if i-exclusion_zone ≤ j ≤ i+exclusion_zone
+                D[j] = Inf
+            else
+                frac = (QT[j] - mμ*μ[j]) * LoopVectorization.VectorizationBase.vinv_fast(mσ*σ[j])
+                D[j] = sqrt(max(2m*(1-frac), O))
+            end
+        end
+    else
+        @avx unroll=4 for j = eachindex(D)
+            # frac = (QT[j] - mμ*μ[j]) / (mσ*σ[j])
+            # frac = (QT[j] - mμ*μ[j]) * Base.FastMath.inv_fast(mσ*σ[j])
+            frac = (QT[j] - mμ*μ[j]) * LoopVectorization.VectorizationBase.vinv_fast(mσ*σ[j])
+            D[j] = sqrt(max(2m*(1-frac), O))
+        end
     end
     D[i] = typemax(eltype(D))
     D
