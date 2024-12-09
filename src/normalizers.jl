@@ -36,7 +36,7 @@ advance!(x) = 0 # Catches everything that's not a normalizer
 
 setup_normalizer(n::Type{Nothing}, q, y) = q, y
 
-normalize(::Type{Nothing}, q) = q
+normalize(::Type{Nothing}, q::Real) = q
 
 (z::AbstractNormalizer)(q) = normalize(z, q)
 (::Type{N})(q) where N <: AbstractNormalizer = normalize(N, q)
